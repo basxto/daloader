@@ -5,12 +5,17 @@ import argparse
 import requests
 import urllib.request
 import re
+import html
 
-ccRegex = re.compile('/(by[a-z-]*)/')
-ccVerRegex = re.compile('[0-9]\.[0-9]')
-specialChars = re.compile('[^a-zA-Z0-9-]+')
+ccRegex = re.compile('/(by[a-z\\-]*)/')
+ccVerRegex = re.compile('[0-9]\\.[0-9]')
+specialChars = re.compile('[^a-zA-Z0-9\'\\-]+')
 urlRegex = re.compile('https?://')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
+descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
+scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
+multiWhitespace = re.compile('\\s\\s+')
+tagRegex = re.compile('<.*?>')
 
 def downloadDeviation(url):
     global ccRegex
@@ -46,11 +51,11 @@ def downloadDeviation(url):
         dirname = os.path.join(license.replace(' ','_'),author)
         if args.no_author_folder:
             dirname = license.replace(' ','_')
-        fullPath = os.path.join(dirname, workFile)
-        # downloads limited to photos for now
-        if deviation['type'] == 'photo':
+        # downloads limited to images and stories
+        if deviation['type'] == 'photo' and (not args.type or args.type.lower() == 'photo'):
             # use original file extension
             workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
+            fullPath = os.path.join(dirname, workFile)
             # create folders
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
@@ -59,6 +64,36 @@ def downloadDeviation(url):
                 urllib.request.urlretrieve(deviation['url'], fullPath)
             # print markdown attribution
             print('![{}]({}) as [{}]({}) licenced under [{}]({}) by [{}]({})'.format(workFile, fullPath, deviation['title'], url, license, licenseUrl, deviation['author_name'], deviation['author_url']))
+            matched = True
+        elif deviation['type'] == 'rich' and (not args.type or args.type.lower() == 'story'):
+            workFile = '{}.{}'.format(workFile,'txt')
+            fullPath = os.path.join(dirname, workFile)
+            # create folders
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+            # download image
+            if not os.path.exists(fullPath):
+                realDeviation = requests.get(url).text
+                #print(descriptionRegex.findall(realDeviation))
+                # pick description
+                content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
+                # remove scripts
+                content = scriptRegex.sub('', content)
+                # remove too much whitespace
+                content = multiWhitespace.sub(' ', content)
+                # replace breaks
+                content = content.replace('<br />','\n')
+                # remove HTML tags
+                content = tagRegex.sub('', content)
+                # unescape escaped characters
+                content = html.unescape(content)
+                # write file
+                file = open(fullPath, 'w')
+                if args.header:
+                    file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
+                file.write(content)
+            # print markdown attribution
+            print('{} as [{}]({}) licenced under [{}]({}) by [{}]({})'.format(fullPath, deviation['title'], url, license, licenseUrl, deviation['author_name'], deviation['author_url']))
             matched = True
     return matched
 
@@ -72,6 +107,8 @@ def main():
     parser.add_argument("--no-adult", help="Only allow deviations, which are not mature content")
     parser.add_argument("--adult-only", help="Only allow adult deviations")
     parser.add_argument("--no-author-folder", help="Don't use author folders")
+    parser.add_argument("--header", help="Put url and title on top of stories")
+    parser.add_argument("--type", help="Limit media type (photo, story)")
     global args
     args = parser.parse_args()
     if args.query:
@@ -94,7 +131,7 @@ def main():
             for url in file:
                 downloadDeviation(url.strip())
     elif args.url:
-        downloadDeviation(url.strip())
+        downloadDeviation(args.url.strip())
     else:
         parser.print_help()
 
