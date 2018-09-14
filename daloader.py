@@ -10,6 +10,7 @@ ccRegex = re.compile('/(by[a-z-]*)/')
 ccVerRegex = re.compile('[0-9]\.[0-9]')
 specialChars = re.compile('[^a-zA-Z0-9-]+')
 urlRegex = re.compile('https?://')
+rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 
 def downloadDeviation(url, cc_only):
     global ccRegex
@@ -53,9 +54,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", help="Deviantart site")
     parser.add_argument("-f", help="Read URLs from file")
+    parser.add_argument("--query", help="Download first 60 matches for term")
+    parser.add_argument("--offset", default="0", help="Skip x first search entries")
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
     args = parser.parse_args()
-    if args.f:
+    if args.query:
+        search = requests.get('https://backend.deviantart.com/rss.xml?type=deviation&q={}&offset={}'.format(args.query,args.offset)).text
+        for url in rssLinks.findall(search):
+            downloadDeviation(url.strip(), args.cc_only)
+    elif args.f:
         with open(args.f, 'r') as file:
             for url in file:
                 downloadDeviation(url.strip(), args.cc_only)
