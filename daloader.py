@@ -12,20 +12,21 @@ specialChars = re.compile('[^a-zA-Z0-9-]+')
 urlRegex = re.compile('https?://')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 
-def downloadDeviation(url, ccOnly, sfwOnly, nsfwOnly):
+def downloadDeviation(url):
     global ccRegex
     global ccVerRegex
     global specialChars
     global urlRegex
+    global args
     if not urlRegex.match(url):
         sys.stderr.write('Skip invalid url "{}"\n'.format(url))
         return False
     # get json representation
     deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
-    if sfwOnly and deviation['safety'] == 'adult':
+    if args.no_adult and deviation['safety'] == 'adult':
         sys.stderr.write('Skip adult content {}\n'.format(url))
         return False
-    if nsfwOnly and deviation['safety'] == 'nonadult':
+    if args.adult_only and deviation['safety'] == 'nonadult':
         sys.stderr.write('Skip non-adult content {}\n'.format(url))
         return False
     matched = False
@@ -35,7 +36,7 @@ def downloadDeviation(url, ccOnly, sfwOnly, nsfwOnly):
         href = deviation['license']['_attributes']['href']
         license = ccRegex.findall(href)[0] + ' ' + ccVerRegex.findall(href)[0]
         licenseUrl = deviation['license']['_attributes']['href']
-    if license == 'proprietary' and ccOnly:
+    if license == 'proprietary' and args.cc_only:
         sys.stderr.write("Skip {} deviation {}\n".format(license, url))
     else:
         # replace all special characters with _
@@ -43,6 +44,8 @@ def downloadDeviation(url, ccOnly, sfwOnly, nsfwOnly):
         # use original file extension
         workFile = specialChars.sub('_', deviation['title'].lower())
         dirname = os.path.join(license.replace(' ','_'),author)
+        if args.no_author_folder:
+            dirname = license.replace(' ','_')
         fullPath = os.path.join(dirname, workFile)
         # downloads limited to photos for now
         if deviation['type'] == 'photo':
@@ -68,6 +71,8 @@ def main():
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
     parser.add_argument("--no-adult", help="Only allow deviations, which are not mature content")
     parser.add_argument("--adult-only", help="Only allow adult deviations")
+    parser.add_argument("--no-author-folder", help="Don't use author folders")
+    global args
     args = parser.parse_args()
     if args.query:
         matched = 0
@@ -80,16 +85,16 @@ def main():
                 sys.stderr.write('Only {} matches found\n'.format(matched))
                 pass
             for url in urls:
-                if downloadDeviation(url.strip(), args.cc_only, args.no_adult, args.adult_only):
+                if downloadDeviation(url.strip()):
                     matched+=1
             # deviantart returns 60 matches
             offset+=60
     elif args.f:
         with open(args.f, 'r') as file:
             for url in file:
-                downloadDeviation(url.strip(), args.cc_only, args.no_adult, args.adult_only)
+                downloadDeviation(url.strip())
     elif args.url:
-        downloadDeviation(url.strip(), args.cc_only, args.no_adult, args.adult_only)
+        downloadDeviation(url.strip())
     else:
         parser.print_help()
 
