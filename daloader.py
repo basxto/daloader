@@ -127,6 +127,8 @@ def main():
             for url in urls:
                 if downloadDeviation(url.strip()):
                     matched+=1
+                    if matched >= int(args.amount):
+                        break
             # deviantart returns 60 matches
             offset+=60
     elif args.f:
