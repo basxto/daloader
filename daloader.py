@@ -48,8 +48,8 @@ def downloadDeviation(url):
         sys.stderr.write("Skip {} deviation {}\n".format(license, url))
         return False
     else:
-        # use original file extension
-        workFile = specialChars.sub('_', deviation['title'].lower())
+        # get unique name from url
+        workFile = specialChars.sub('_', url.split('/')[-1].lower())
         dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation).lower())
         # os.path.exists does not accept empty string
         if dirname == '':
@@ -137,7 +137,5 @@ def main():
         downloadDeviation(args.url.strip())
     else:
         parser.print_help()
-
-
 
 main()
