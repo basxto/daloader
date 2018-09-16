@@ -9,7 +9,7 @@ import html
 
 ccRegex = re.compile('/(by[a-z\\-]*)/')
 ccVerRegex = re.compile('[0-9]\\.[0-9]')
-specialChars = re.compile('[^a-zA-Z0-9\'\\-]+')
+specialChars = re.compile('[^a-zA-Z0-9/\\.\'\\-]+')
 urlRegex = re.compile('https?://')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
@@ -34,25 +34,26 @@ def downloadDeviation(url):
     if args.adult_only and deviation['safety'] == 'nonadult':
         sys.stderr.write('Skip non-adult content {}\n'.format(url))
         return False
-    matched = False
     license = 'proprietary'
     licenseUrl = '#'
     if 'license' in deviation and '_attributes' in deviation['license'] and len(deviation['license']['_attributes']['href']) > 0:
         href = deviation['license']['_attributes']['href']
         license = ccRegex.findall(href)[0] + ' ' + ccVerRegex.findall(href)[0]
         licenseUrl = deviation['license']['_attributes']['href']
+
     if license == 'proprietary' and args.cc_only:
         sys.stderr.write("Skip {} deviation {}\n".format(license, url))
+        return False
     else:
-        # replace all special characters with _
-        author = specialChars.sub('_', deviation['author_name'].lower())
         # use original file extension
         workFile = specialChars.sub('_', deviation['title'].lower())
-        dirname = os.path.join(license.replace(' ','_'),author)
-        if args.no_author_folder:
-            dirname = license.replace(' ','_')
+        dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation).lower())
+        # os.path.exists does not accept empty string
+        if dirname == '':
+            dirname = '.'
+        fullPath = os.path.join(dirname, workFile)
         # downloads limited to images and stories
-        if deviation['type'] == 'photo' and (not args.type or args.type.lower() == 'photo'):
+        if deviation['type'] == 'photo' and (not args.type or args.type.lower() == 'picture'):
             # use original file extension
             workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
             fullPath = os.path.join(dirname, workFile)
@@ -62,9 +63,6 @@ def downloadDeviation(url):
             # download image
             if not os.path.exists(fullPath):
                 urllib.request.urlretrieve(deviation['url'], fullPath)
-            # print markdown attribution
-            print('![{}]({}) as [{}]({}) licenced under [{}]({}) by [{}]({})'.format(workFile, fullPath, deviation['title'], url, license, licenseUrl, deviation['author_name'], deviation['author_url']))
-            matched = True
         elif deviation['type'] == 'rich' and (not args.type or args.type.lower() == 'story'):
             workFile = '{}.{}'.format(workFile,'txt')
             fullPath = os.path.join(dirname, workFile)
@@ -92,10 +90,11 @@ def downloadDeviation(url):
                 if args.header:
                     file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
                 file.write(content)
-            # print markdown attribution
-            print('{} as [{}]({}) licenced under [{}]({}) by [{}]({})'.format(fullPath, deviation['title'], url, license, licenseUrl, deviation['author_name'], deviation['author_url']))
-            matched = True
-    return matched
+            else:
+                sys.stderr.write('Type {} not supported\n'.format(deviation['type']))
+                return True
+    print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation, path=fullPath, folder=dirname, filename=workFile))
+    return True
 
 def main():
     parser = argparse.ArgumentParser()
@@ -106,9 +105,10 @@ def main():
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
     parser.add_argument("--no-adult", help="Only allow deviations, which are not mature content")
     parser.add_argument("--adult-only", help="Only allow adult deviations")
-    parser.add_argument("--no-author-folder", help="Don't use author folders")
     parser.add_argument("--header", help="Put url and title on top of stories")
-    parser.add_argument("--type", help="Limit media type (photo, story)")
+    parser.add_argument("--type", help="Limit media type (picture, story)")
+    parser.add_argument("--folder-format", default='{license}', help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title}")
+    parser.add_argument("--output-format", default='[{filename}]({path}) as [{title}]({url}) licenced under [{license}]({license_url}) by [{author}]({author_url})', help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title} {path} {folder} {filename}")
     global args
     args = parser.parse_args()
     if args.query:
@@ -120,7 +120,7 @@ def main():
             # stop when we get an empty response
             if len(urls) == 0:
                 sys.stderr.write('Only {} matches found\n'.format(matched))
-                pass
+                break
             for url in urls:
                 if downloadDeviation(url.strip()):
                     matched+=1
