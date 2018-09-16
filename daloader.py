@@ -17,6 +17,9 @@ scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
 multiWhitespace = re.compile('\\s\\s+')
 tagRegex = re.compile('<.*?>')
 
+def stringToBool(str):
+    return str and ( str.upper() == 'YES' or str.upper() == 'TRUE' or str.upper() == 'ON' or str.upper() == 'Y' or str == '1')
+
 def downloadDeviation(url):
     global ccRegex
     global ccVerRegex
@@ -28,10 +31,10 @@ def downloadDeviation(url):
         return False
     # get json representation
     deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
-    if args.no_adult and deviation['safety'] == 'adult':
+    if stringToBool(args.no_adult) and deviation['safety'] == 'adult':
         sys.stderr.write('Skip adult content {}\n'.format(url))
         return False
-    if args.adult_only and deviation['safety'] == 'nonadult':
+    if stringToBool(args.adult_only) and deviation['safety'] == 'nonadult':
         sys.stderr.write('Skip non-adult content {}\n'.format(url))
         return False
     license = 'proprietary'
@@ -41,7 +44,7 @@ def downloadDeviation(url):
         license = ccRegex.findall(href)[0] + ' ' + ccVerRegex.findall(href)[0]
         licenseUrl = deviation['license']['_attributes']['href']
 
-    if license == 'proprietary' and args.cc_only:
+    if license == 'proprietary' and stringToBool(args.cc_only):
         sys.stderr.write("Skip {} deviation {}\n".format(license, url))
         return False
     else:
@@ -87,7 +90,7 @@ def downloadDeviation(url):
                 content = html.unescape(content)
                 # write file
                 file = open(fullPath, 'w')
-                if args.header:
+                if stringToBool(args.header):
                     file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
                 file.write(content)
             else:
@@ -101,14 +104,14 @@ def main():
     parser.add_argument("--url", help="Deviantart site")
     parser.add_argument("-f", help="Read URLs from file")
     parser.add_argument("--query", help="Download first matches for search term")
-    parser.add_argument("--amount", default="20", help="How many matches to download")
+    parser.add_argument("--amount", default="20", help="How many matches to download (default is 20)")
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
-    parser.add_argument("--no-adult", help="Only allow deviations, which are not mature content")
+    parser.add_argument("--no-adult", default="yes", help="Only allow deviations, which are not mature content (default)")
     parser.add_argument("--adult-only", help="Only allow adult deviations")
-    parser.add_argument("--header", help="Put url and title on top of stories")
+    parser.add_argument("--header", default="yes", help="Put url and title on top of stories (default)")
     parser.add_argument("--type", help="Limit media type (picture, story)")
-    parser.add_argument("--folder-format", default='{license}', help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title}")
-    parser.add_argument("--output-format", default='[{filename}]({path}) as [{title}]({url}) licenced under [{license}]({license_url}) by [{author}]({author_url})', help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title} {path} {folder} {filename}")
+    parser.add_argument("--folder-format", default="{license}", help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title}")
+    parser.add_argument("--output-format", default="[{filename}]({path}) as [{title}]({url}) licenced under [{license}]({license_url}) by [{author}]({author_url})", help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title} {path} {folder} {filename}")
     global args
     args = parser.parse_args()
     if args.query:
