@@ -32,10 +32,10 @@ def downloadDeviation(url):
     # get json representation
     deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
     if stringToBool(args.no_adult) and deviation['safety'] == 'adult':
-        sys.stderr.write('Skip adult content {}\n'.format(url))
+        sys.stderr.write('Skip adult content "{}"\n'.format(url))
         return False
     if stringToBool(args.adult_only) and deviation['safety'] == 'nonadult':
-        sys.stderr.write('Skip non-adult content {}\n'.format(url))
+        sys.stderr.write('Skip non-adult content "{}"\n'.format(url))
         return False
     license = 'proprietary'
     licenseUrl = '#'
@@ -45,7 +45,7 @@ def downloadDeviation(url):
         licenseUrl = deviation['license']['_attributes']['href']
 
     if license == 'proprietary' and stringToBool(args.cc_only):
-        sys.stderr.write("Skip {} deviation {}\n".format(license, url))
+        sys.stderr.write('Skip "{}" deviation "{}"\n'.format(license, url))
         return False
     else:
         # get unique name from url
@@ -56,46 +56,54 @@ def downloadDeviation(url):
             dirname = '.'
         fullPath = os.path.join(dirname, workFile)
         # downloads limited to images and stories
-        if deviation['type'] == 'photo' and (not args.type or args.type.lower() == 'picture'):
-            # use original file extension
-            workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
-            fullPath = os.path.join(dirname, workFile)
-            # create folders
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
-            # download image
-            if not os.path.exists(fullPath):
-                urllib.request.urlretrieve(deviation['url'], fullPath)
-        elif deviation['type'] == 'rich' and (not args.type or args.type.lower() == 'story'):
-            workFile = '{}.{}'.format(workFile,'txt')
-            fullPath = os.path.join(dirname, workFile)
-            # create folders
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
-            # download image
-            if not os.path.exists(fullPath):
-                realDeviation = requests.get(url).text
-                #print(descriptionRegex.findall(realDeviation))
-                # pick description
-                content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
-                # remove scripts
-                content = scriptRegex.sub('', content)
-                # remove too much whitespace
-                content = multiWhitespace.sub(' ', content)
-                # replace breaks
-                content = content.replace('<br />','\n')
-                # remove HTML tags
-                content = tagRegex.sub('', content)
-                # unescape escaped characters
-                content = html.unescape(content)
-                # write file
-                file = open(fullPath, 'w')
-                if stringToBool(args.header):
-                    file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
-                file.write(content)
+        if deviation['type'] == 'photo':
+            if not args.type or args.type.lower() == 'picture':
+                # use original file extension
+                workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
+                fullPath = os.path.join(dirname, workFile)
+                # create folders
+                if not os.path.exists(dirname):
+                    os.makedirs(dirname)
+                # download image
+                if not os.path.exists(fullPath):
+                    urllib.request.urlretrieve(deviation['url'], fullPath)
             else:
-                sys.stderr.write('Type {} not supported\n'.format(deviation['type']))
-                return True
+                sys.stderr.write('Type "{}" skipped\n'.format(deviation['type']))
+                return False
+        elif deviation['type'] == 'rich':
+            if not args.type or args.type.lower() == 'story':
+                workFile = '{}.{}'.format(workFile,'txt')
+                fullPath = os.path.join(dirname, workFile)
+                # create folders
+                if not os.path.exists(dirname):
+                    os.makedirs(dirname)
+                # download image
+                if not os.path.exists(fullPath):
+                    realDeviation = requests.get(url).text
+                    #print(descriptionRegex.findall(realDeviation))
+                    # pick description
+                    content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
+                    # remove scripts
+                    content = scriptRegex.sub('', content)
+                    # remove too much whitespace
+                    content = multiWhitespace.sub(' ', content)
+                    # replace breaks
+                    content = content.replace('<br />','\n')
+                    # remove HTML tags
+                    content = tagRegex.sub('', content)
+                    # unescape escaped characters
+                    content = html.unescape(content)
+                    # write file
+                    file = open(fullPath, 'w')
+                    if stringToBool(args.header):
+                        file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
+                    file.write(content)
+            else:
+                sys.stderr.write('Type "{}" skipped\n'.format(deviation['type']))
+                return False
+        else:
+            sys.stderr.write('Type "{}" not supported\n'.format(deviation['type']))
+            return False
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation, path=fullPath, folder=dirname, filename=workFile))
     return True
 
