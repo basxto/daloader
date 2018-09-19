@@ -23,7 +23,11 @@ def stringToBool(str):
 
 def downloadDeviation(url):
     # get json representation
-    deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
+    try:
+        deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
+    except ValueError:
+        sys.stderr.write('Failed to parse deviation "{}"\n'.format(url))
+        return False
     if stringToBool(args.no_adult) and deviation['safety'] == 'adult':
         sys.stderr.write('Skip adult content "{}"\n'.format(url))
         return False
@@ -137,6 +141,10 @@ def handleUrl(url):
         else:
             # gallery directory
             directory = requests.get(url).text
+            titles = galleryTitleRegex.findall(directory)
+            if len(titles) == 0:
+                sys.stderr.write('Can\'t extract title of gallery directory "{}"\n'.format(url))
+                return False
             meta = galleryTitleRegex.findall(directory)[0]
         crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
     elif '/favourites/' in url:
