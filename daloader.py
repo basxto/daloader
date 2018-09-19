@@ -121,6 +121,29 @@ def crawl(url):
         # deviantart returns 60 matches
         offset+=60
 
+def handleUrl(url):
+        matches = urlRegex.findall(url)
+        if matches[0][0] == 'www':
+            author = matches[0][1]
+        else:
+            author = matches[0][0]
+        if '/art/' in url:
+            downloadDeviation(url.strip())
+        elif '/gallery/' in url:
+            # check if there's more comming
+            if url.split('/')[-2] == 'gallery':
+                # all deviations of this author
+                meta = 'all'
+            else:
+                # gallery directory
+                directory = requests.get(url).text
+                meta = galleryTitleRegex.findall(directory)[0]
+            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
+        elif '/favourites/' in url:
+            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(author))
+        else:
+            sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", help="Deviantart site or gallery")
@@ -147,29 +170,9 @@ def main():
     elif args.f:
         with open(args.f, 'r') as file:
             for url in file:
-                downloadDeviation(url.strip())
+                handleUrl(url.strip())
     elif args.url:
-        matches = urlRegex.findall(args.url)
-        if matches[0][0] == 'www':
-            author = matches[0][1]
-        else:
-            author = matches[0][0]
-        if '/art/' in args.url:
-            downloadDeviation(args.url.strip())
-        elif '/gallery/' in args.url:
-            # check if there's more comming
-            if args.url.split('/')[-2] == 'gallery':
-                # all deviations of this author
-                meta = 'all'
-            else:
-                # gallery directory
-                directory = requests.get(args.url).text
-                meta = galleryTitleRegex.findall(directory)[0]
-            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
-        elif '/favourites/' in args.url:
-            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(author))
-        else:
-            sys.stderr.write('Can\'t handle url "{}"\n'.format(args.url))
+        handleUrl(args.url)
     else:
         parser.print_help()
 
