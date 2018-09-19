@@ -1,6 +1,7 @@
 Download images and stories from deviantart.com
 
 # Features
+* Work directly with artwork or gallery URLs
 * Filter out proprietary artwork (no creative commons)
 * Filter by type (image, story)
 * Filter by safety status (all, adult, non-adult)
