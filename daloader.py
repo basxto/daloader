@@ -10,7 +10,7 @@ import html
 ccRegex = re.compile('/(by[a-z\\-]*)/')
 ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
-urlRegex = re.compile('https?://(\\w+).deviantart.com/(\\w+).*')
+urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
 scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
@@ -22,11 +22,6 @@ def stringToBool(str):
     return str and ( str.upper() == 'YES' or str.upper() == 'TRUE' or str.upper() == 'ON' or str.upper() == 'Y' or str == '1')
 
 def downloadDeviation(url):
-    global ccRegex
-    global ccVerRegex
-    global specialChars
-    global urlRegex
-    global args
     if not urlRegex.match(url):
         sys.stderr.write('Skip invalid url "{}"\n'.format(url))
         return False
@@ -131,7 +126,8 @@ def main():
     parser.add_argument("--url", help="Deviantart site or gallery")
     parser.add_argument("-f", help="Read URLs from file")
     parser.add_argument("--query", help="Download first matches for search term")
-    parser.add_argument("--author", help="Download first matches of author's gallery")
+    parser.add_argument("--gallery", help="Download first matches of specified user's gallery")
+    parser.add_argument("--favorite", help="Download first matches of specified user's favorites")
     parser.add_argument("--amount", default="20", help="How many matches to download (default is 20)")
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
     parser.add_argument("--no-adult", default="yes", help="Only allow deviations, which are not mature content (default)")
@@ -144,21 +140,23 @@ def main():
     args = parser.parse_args()
     if args.query:
         crawl('https://backend.deviantart.com/rss.xml?type=deviation&q={}'.format(args.query))
-    elif args.author:
-        crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:all'.format(args.author))
+    elif args.gallery:
+        crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:all'.format(args.gallery))
+    elif args.favorite:
+        crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(args.favorite))
     elif args.f:
         with open(args.f, 'r') as file:
             for url in file:
                 downloadDeviation(url.strip())
     elif args.url:
+        matches = urlRegex.findall(args.url)
+        if matches[0][0] == 'www':
+            author = matches[0][1]
+        else:
+            author = matches[0][0]
         if '/art/' in args.url:
             downloadDeviation(args.url.strip())
         elif '/gallery/' in args.url:
-            matches = urlRegex.findall(args.url)
-            if matches[0][0] == 'www':
-                author = matches[0][1]
-            else:
-                author = matches[0][0]
             # check if there's more comming
             if args.url.split('/')[-2] == 'gallery':
                 # all deviations of this author
@@ -168,6 +166,8 @@ def main():
                 directory = requests.get(args.url).text
                 meta = galleryTitleRegex.findall(directory)[0]
             crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
+        elif '/favourites/' in args.url:
+            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(author))
         else:
             sys.stderr.write('Can\'t handle url "{}"\n'.format(args.url))
     else:

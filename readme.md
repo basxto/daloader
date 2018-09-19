@@ -1,13 +1,18 @@
 Download images and stories from deviantart.com
 
 # Features
-* Work directly with artwork or gallery URLs
+* Work directly with artwork, favorite or gallery URLs
 * Filter out proprietary artwork (no creative commons)
 * Filter by type (image, story)
 * Filter by safety status (all, adult, non-adult)
 * Get URLs from plain text list
 * Get URLs via search query
 * Output attribution information in terminal
+
+# How Deviantart gets accessed
+* [RSS API](https://www.deviantart.com/developers/rss) (search, gallery, favorite)
+* [oEmbed API](https://www.deviantart.com/developers/oembed) (filters, image extraction)
+* Parsing the site (gallery folders, story extraction)
 
 # Example
 
