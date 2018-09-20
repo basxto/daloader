@@ -11,7 +11,8 @@ ccRegex = re.compile('/(by[a-z\\-]*)/')
 ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
 urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
-wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/File:(.+)')
+# allows anchor links
+wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
@@ -134,6 +135,8 @@ def downloadWiki(url):
         authorUrl = matches[0][0]
     else:
         author = extmeta['Artist']['value']
+    # rewrite anchor urls
+    url = 'https://commons.wikimedia.org/wiki/File:{}'.format(workFile)
     # define paths
     workFile = specialChars.sub('_', workFile.lower())
     dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=extmeta['LicenseUrl']['value'], url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}).lower())
