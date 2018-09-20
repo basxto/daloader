@@ -12,7 +12,7 @@ ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
 urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
 # allows anchor links
-wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+?)(?:\?.*)?')
+wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)(?:\\?.*)?')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
@@ -117,35 +117,50 @@ def downloadWiki(url):
     author = 'unknown'
     authorUrl = '#'
     license = 'proprietary'
+    licenseUrl = '#'
     metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile)).json()
     urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile)).json()
     # we don't know the page id, but only have one match
+
     pages = metaResponse['query']['pages']
     for page in pages:
         pageid = page
+        if not 'imageinfo' in pages[page]:
+            sys.stderr.write('Can\'t get meta data for "{}"\n'.format(url))
+            return False
         extmeta = pages[page]['imageinfo'][0]['extmetadata']
     # url of the media file
+    if not 'imageinfo' in urlResponse['query']['pages'][pageid]:
+        sys.stderr.write('Can\'t get media url for "{}"\n'.format(url))
+        return False
     rawUrl = urlResponse['query']['pages'][pageid]['imageinfo'][0]['url']
-    license = extmeta['LicenseShortName']['value']
-    # use format of deviantart
-    license = license.replace('CC ', '')
-    if htmlLinks.match(extmeta['Artist']['value']):
-        matches = htmlLinks.findall(extmeta['Artist']['value'])
-        author = matches[0][1]
-        authorUrl = matches[0][0]
-    else:
-        author = extmeta['Artist']['value']
+    if 'LicenseShortName' in extmeta:
+        license = extmeta['LicenseShortName']['value']
+        # use format of deviantart
+        license = license.replace('CC ', '')
+    if 'LicenseUrl' in extmeta:
+        licenseUrl = extmeta['LicenseUrl']['value']
+    if 'Artist' in extmeta:
+        if htmlLinks.match(extmeta['Artist']['value']):
+            matches = htmlLinks.findall(extmeta['Artist']['value'])
+            author = matches[0][1]
+            authorUrl = matches[0][0]
+            if authorUrl.startswith('//'):
+                # fix urls
+                authorUrl = 'https:' + authorUrl
+        else:
+            author = extmeta['Artist']['value']
     # rewrite anchor urls
     url = 'https://commons.wikimedia.org/wiki/File:{}'.format(workFile)
     # define paths
     workFile = specialChars.sub('_', workFile.lower())
-    dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=extmeta['LicenseUrl']['value'], url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}).lower())
+    dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}).lower())
     # os.path.exists does not accept empty string
     if dirname == '':
         dirname = '.'
     fullPath = os.path.join(dirname, workFile)
     downloadFile(dirname, fullPath, rawUrl)
-    print(args.output_format.format(license=license, license_url=extmeta['LicenseUrl']['value'], url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}, path=fullPath, folder=dirname, filename=workFile))
+    print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}, path=fullPath, folder=dirname, filename=workFile))
     return False
 
 def crawl(url):
