@@ -17,8 +17,13 @@ Download images and stories from deviantart.com
 # Example
 
 `./daloader.py --query "pepper carrot" --cc-only yes > attribution.md`
+`./daloader.py --query "wallpaper in:photography/abstract" > attribution.md`
+`./daloader.py --url https://www.deviantart.com/deevad/gallery/31863052/Comic-Pepper-Carrot --cc-only y > attribution.md`
 
-Further examples are located in `examples/`
+
+More information for query syntax at [deviantart](https://www.deviantartsupport.com/en/article/how-do-i-use-rss-feeds)
+
+Example scripts with further processing of the output in `examples/`
 
 # Installation
 ## Linux
