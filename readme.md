@@ -1,13 +1,16 @@
-Download images and stories from deviantart.com
+**D**igital **a**rtwork down**loader** for deviantart.com and commons.wikimedia.org
 
 # Features
+## General
+* Get URLs from plain text list
+* Output attribution information in terminal
+
+## Deviantart
 * Work directly with artwork, favorite or gallery URLs
 * Filter out proprietary artwork (no creative commons)
 * Filter by type (image, story)
 * Filter by safety status (all, adult, non-adult)
-* Get URLs from plain text list
 * Get URLs via search query
-* Output attribution information in terminal
 
 # How Deviantart gets accessed
 * [RSS API](https://www.deviantart.com/developers/rss) (search, gallery, favorite)

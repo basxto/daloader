@@ -11,7 +11,9 @@ ccRegex = re.compile('/(by[a-z\\-]*)/')
 ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
 urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
+wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/File:(.+)')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
+htmlLinks = re.compile('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
 scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
 multiWhitespace = re.compile('\\s\\s+')
@@ -20,6 +22,14 @@ galleryTitleRegex = re.compile('<span class="folder-title">([^<]*)</span>')
 
 def stringToBool(str):
     return str and ( str.upper() == 'YES' or str.upper() == 'TRUE' or str.upper() == 'ON' or str.upper() == 'Y' or str == '1')
+
+def downloadFile(dirname, fullPath, url):
+    # create folders
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    # download image
+    if not os.path.exists(fullPath):
+        urllib.request.urlretrieve(url, fullPath)
 
 def downloadDeviation(url):
     # get json representation
@@ -58,12 +68,7 @@ def downloadDeviation(url):
                 # use original file extension
                 workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
                 fullPath = os.path.join(dirname, workFile)
-                # create folders
-                if not os.path.exists(dirname):
-                    os.makedirs(dirname)
-                # download image
-                if not os.path.exists(fullPath):
-                    urllib.request.urlretrieve(deviation['url'], fullPath)
+                downloadFile(dirname, fullPath, deviation['url'])
             else:
                 sys.stderr.write('Type "{}" skipped\n'.format(deviation['type']))
                 return False
@@ -104,6 +109,42 @@ def downloadDeviation(url):
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation, path=fullPath, folder=dirname, filename=workFile))
     return True
 
+def downloadWiki(url):
+    workFile = wikicommonsRegex.findall(url)[0]
+    fullPath = ''
+    dirname = ''
+    author = 'unknown'
+    authorUrl = '#'
+    license = 'proprietary'
+    metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile)).json()
+    urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile)).json()
+    # we don't know the page id, but only have one match
+    pages = metaResponse['query']['pages']
+    for page in pages:
+        pageid = page
+        extmeta = pages[page]['imageinfo'][0]['extmetadata']
+    # url of the media file
+    rawUrl = urlResponse['query']['pages'][pageid]['imageinfo'][0]['url']
+    license = extmeta['LicenseShortName']['value']
+    # use format of deviantart
+    license = license.replace('CC ', '')
+    if htmlLinks.match(extmeta['Artist']['value']):
+        matches = htmlLinks.findall(extmeta['Artist']['value'])
+        author = matches[0][1]
+        authorUrl = matches[0][0]
+    else:
+        author = extmeta['Artist']['value']
+    # define paths
+    workFile = specialChars.sub('_', workFile.lower())
+    dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=extmeta['LicenseUrl']['value'], url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}).lower())
+    # os.path.exists does not accept empty string
+    if dirname == '':
+        dirname = '.'
+    fullPath = os.path.join(dirname, workFile)
+    downloadFile(dirname, fullPath, rawUrl)
+    print(args.output_format.format(license=license, license_url=extmeta['LicenseUrl']['value'], url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}, path=fullPath, folder=dirname, filename=workFile))
+    return False
+
 def crawl(url):
     matched = 0
     offset = 0
@@ -123,34 +164,37 @@ def crawl(url):
         offset+=60
 
 def handleUrl(url):
-    if not urlRegex.match(url):
-        sys.stderr.write('Skip invalid url "{}"\n'.format(url))
-        return False
-    matches = urlRegex.findall(url)
-    if matches[0][0] == 'www':
-        author = matches[0][1]
-    else:
-        author = matches[0][0]
-    if '/art/' in url:
-        downloadDeviation(url.strip())
-    elif '/gallery/' in url:
-        # check if there's more comming
-        if url.split('/')[-2] == 'gallery':
-            # all deviations of this author
-            meta = 'all'
+    if urlRegex.match(url):
+        matches = urlRegex.findall(url)
+        if matches[0][0] == 'www':
+            author = matches[0][1]
         else:
-            # gallery directory
-            directory = requests.get(url).text
-            titles = galleryTitleRegex.findall(directory)
-            if len(titles) == 0:
-                sys.stderr.write('Can\'t extract title of gallery directory "{}"\n'.format(url))
-                return False
-            meta = galleryTitleRegex.findall(directory)[0]
-        crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
-    elif '/favourites/' in url:
-        crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(author))
+            author = matches[0][0]
+        if '/art/' in url:
+            return downloadDeviation(url.strip())
+        elif '/gallery/' in url:
+            # check if there's more comming
+            if url.split('/')[-2] == 'gallery':
+                # all deviations of this author
+                meta = 'all'
+            else:
+                # gallery directory
+                directory = requests.get(url).text
+                titles = galleryTitleRegex.findall(directory)
+                if len(titles) == 0:
+                    sys.stderr.write('Can\'t extract title of gallery directory "{}"\n'.format(url))
+                    return False
+                meta = galleryTitleRegex.findall(directory)[0]
+            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=by:{} sort:time meta:{}'.format(author, meta))
+        elif '/favourites/' in url:
+            crawl('https://backend.deviantart.com/rss.xml?type=deviation&q=favby:{}'.format(author))
+        else:
+            sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
+    elif wikicommonsRegex.match(url):
+        downloadWiki(url)
     else:
         sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
+        return False
     return True
 
 def main():
