@@ -12,7 +12,7 @@ ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
 urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
 # allows anchor links
-wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)')
+wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+?)(?:\?.*)?')
 rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
 descriptionRegex = re.compile('<div class="text">(.*?)</div>', re.MULTILINE)
