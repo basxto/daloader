@@ -71,7 +71,7 @@ def downloadDeviation(url):
                 fullPath = os.path.join(dirname, workFile)
                 downloadFile(dirname, fullPath, deviation['url'])
             else:
-                sys.stderr.write('Type "{}" skipped\n'.format(deviation['type']))
+                sys.stderr.write('Type "picture" skipped\n')
                 return False
         elif deviation['type'] == 'rich':
             if not args.type or args.type.lower() == 'story':
@@ -102,7 +102,7 @@ def downloadDeviation(url):
                         file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
                     file.write(content)
             else:
-                sys.stderr.write('Type "{}" skipped\n'.format(deviation['type']))
+                sys.stderr.write('Type "story" skipped\n')
                 return False
         else:
             sys.stderr.write('Type "{}" not supported\n'.format(deviation['type']))
@@ -163,11 +163,11 @@ def downloadWiki(url):
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}, path=fullPath, folder=dirname, filename=workFile))
     return False
 
-def crawl(url):
+def crawl(queryurl):
     matched = 0
     offset = 0
     while matched < int(args.amount):
-        search = requests.get('{}&offset={}'.format(url,offset)).text
+        search = requests.get('{}&offset={}'.format(queryurl,offset)).text
         urls = rssLinks.findall(search)
         # stop when we get an empty response
         if len(urls) == 0:
