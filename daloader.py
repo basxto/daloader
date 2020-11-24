@@ -24,7 +24,11 @@ def stringToBool(str):
 def downloadDeviation(url):
     # get json representation
     try:
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: download {}\n'.format('https://backend.deviantart.com/oembed?url={}'.format(url)))
         deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
+        if args.verbose and args.verbose.lower() == 'v':
+            sys.stderr.write('Debug: oembed deviation:\n {}\n'.format(deviation))
     except ValueError:
         sys.stderr.write('Failed to parse deviation "{}"\n'.format(url))
         return False
@@ -52,6 +56,8 @@ def downloadDeviation(url):
         if dirname == '':
             dirname = '.'
         fullPath = os.path.join(dirname, workFile)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: type {}\n'.format(deviation['type']))
         # downloads limited to images and stories
         if deviation['type'] == 'photo':
             if not args.type or args.type.lower() == 'picture':
@@ -75,9 +81,13 @@ def downloadDeviation(url):
                 if not os.path.exists(dirname):
                     os.makedirs(dirname)
                 # download image
-                if not os.path.exists(fullPath):
+                if not os.path.exists(fullPath) or args.force.lower() != 'no':
                     realDeviation = requests.get(url).text
+                    if args.verbose and args.verbose.lower() == 'vv':
+                        sys.stderr.write('Debug: html deviation:\n {}\n'.format(realDeviation))
                     #print(descriptionRegex.findall(realDeviation))
+                    if args.verbose and args.verbose.lower() == 'v':
+                        sys.stderr.write('Debug: deviation full content:\n {}\n'.format(descriptionRegex.findall(realDeviation)))
                     # pick description
                     content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
                     # remove scripts
@@ -90,6 +100,8 @@ def downloadDeviation(url):
                     content = tagRegex.sub('', content)
                     # unescape escaped characters
                     content = html.unescape(content)
+                    if args.verbose and args.verbose.lower() == 'v':
+                        sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
                     # write file
                     file = open(fullPath, 'w')
                     if stringToBool(args.header):
@@ -105,6 +117,8 @@ def downloadDeviation(url):
     return True
 
 def crawl(url):
+    if args.verbose and args.verbose.lower() != 'no':
+        sys.stderr.write('Debug: crawl {}\n'.format(url))
     matched = 0
     offset = 0
     while matched < int(args.amount):
@@ -123,6 +137,8 @@ def crawl(url):
         offset+=60
 
 def handleUrl(url):
+    if args.verbose and args.verbose.lower() != 'no':
+        sys.stderr.write('Debug: handle {}\n'.format(url))
     if not urlRegex.match(url):
         sys.stderr.write('Skip invalid url "{}"\n'.format(url))
         return False
@@ -157,6 +173,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", help="Deviantart site or gallery")
     parser.add_argument("-f", help="Read URLs from file")
+    parser.add_argument("--verbose", "-v", default="no", help="Verbose; -vv even more verbose; -vvv even html source")
+    parser.add_argument("--force", default="no", help="Overwrite existing files")
     parser.add_argument("--query", help="Download first matches for search term")
     parser.add_argument("--gallery", help="Download first matches of specified user's gallery")
     parser.add_argument("--favorite", help="Download first matches of specified user's favorites")
