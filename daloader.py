@@ -19,16 +19,18 @@ ccVerRegex = re.compile('\\d\\.\\d')
 specialChars = re.compile('[^\\w/\\.\'\\-]+')
 urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
 # allows anchor links
-wikicommonsRegex = re.compile('https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)(?:\\?.*)?')
-rssLinks = re.compile('<guid isPermaLink="true">(.*?)</guid>')
-htmlLinks = re.compile('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
-descriptionRegex = re.compile('<div class="legacy-journal[a-zA-Z0-9_\s]*?">(.*?)</div>', re.MULTILINE)
-scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
-multiWhitespace = re.compile('\\s\\s+')
-tagRegex = re.compile('<.*?>')
-galleryTitleRegex = re.compile('<span class="folder-title">([^<]*)</span>')
+wikicommonsRegex = re.compile(r'https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)(?:\?.*)?')
+rssLinks = re.compile(r'<guid isPermaLink="true">(.*?)</guid>')
+htmlLinks = re.compile(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
+descriptionRegex = re.compile(r'<div class="legacy-journal[a-zA-Z0-9_\s]*?">(.*?)</div>', re.MULTILINE)
+scriptRegex = re.compile(r'<script.*?script>', re.MULTILINE)
+multiWhitespace = re.compile(r'\s\s+')
+multiNewline = re.compile('\n\n\n+')
+breakRegex = re.compile(r'(</p>|<br\s?/?>)')
+tagRegex = re.compile(r'<.*?>')
+galleryTitleRegex = re.compile(r'<span class="folder-title">([^<]*)</span>')
 #jpg from http://bla.bla/bla/bla.jpg?blub&blub
-filextRegex = re.compile('[^\?]*\.([a-z]+)(\?.*)?')
+filextRegex = re.compile(r'[^\?]*\.([a-z]+)(\?.*)?')
 
 def stringToBool(str):
     return str and ( str.upper() == 'YES' or str.upper() == 'TRUE' or str.upper() == 'ON' or str.upper() == 'Y' or str == '1')
@@ -111,11 +113,13 @@ def downloadDeviation(url):
                     # remove too much whitespace
                     content = multiWhitespace.sub(' ', content)
                     # replace breaks
-                    content = content.replace('<br />','\n')
+                    content = breakRegex.sub('\n', content)
                     # remove HTML tags
                     content = tagRegex.sub('', content)
                     # unescape escaped characters
                     content = html.unescape(content)
+                    # and line breaks
+                    content = multiNewline.sub('\n\n', content)
                     if args.verbose and args.verbose.lower() == 'v':
                         sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
                     # write file
