@@ -13,11 +13,6 @@
 * Get URLs via search query
 * Cookie support for mature content
 
-# How Deviantart gets accessed
-* [RSS API](https://www.deviantart.com/developers/rss) (search, gallery, favorite)
-* [oEmbed API](https://www.deviantart.com/developers/oembed) (filters, image extraction)
-* Parsing the site (gallery folders, story extraction)
-
 ## WikiMedia Commons
 * Download videos, animated gifs and image
 * Rewrite URLs
@@ -26,11 +21,20 @@
 * Story extraction via site parsing
 * Rewrite URLs
 
+# How Deviantart gets accessed
+* [RSS API](https://www.deviantart.com/developers/rss) (search, gallery, favorite)
+* [oEmbed API](https://www.deviantart.com/developers/oembed) (filters, image extraction)
+* Parsing the site (gallery folders, story extraction)
+
+# Cookies
+* Place `cookies.txt` in working directory or give a full path with `--cookies`
+* Specify cookies in `daloader.ini` or give a path with `--ini`
+
 # Example
 
 `./daloader.py --query "pepper carrot" --cc-only yes > attribution.md`
 `./daloader.py --query "wallpaper in:photography/abstract" > attribution.md`
-`./daloader.py --url https://www.deviantart.com/deevad/gallery/31863052/Comic-Pepper-Carrot --cc-only y > attribution.md`
+`./daloader.py --url https://www.deviantart.com/deevad/gallery/31863052/Comic-Pepper-Carrot --cc-only y --cookies /tmp/cookies-deviantart-com.txt > attribution.md`
 
 
 More information for query syntax at [deviantart](https://www.deviantartsupport.com/en/article/how-do-i-use-rss-feeds)

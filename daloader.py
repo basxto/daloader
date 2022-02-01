@@ -7,6 +7,7 @@ import urllib.request
 import re
 import html
 import configparser
+import http.cookiejar
 
 cookies = {
     'auth': '',
@@ -295,6 +296,7 @@ def handleUrl(url):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cookies", help="Full path to cookies.txt file (default: working directory)")
     parser.add_argument("--ini", help="Path to .ini file (default: working directory)")
     parser.add_argument("--url", help="Deviantart site or gallery")
     parser.add_argument("-f", help="Read URLs from file")
@@ -319,13 +321,37 @@ def main():
         config.read(args.ini)
     else:
         config.read('daloader.ini')
+    cj = http.cookiejar.MozillaCookieJar()
+    # load cookie file into cookies dict
+    if args.cookies and os.path.exists(args.cookies):
+        cj.load(args.cookies)
+        cookies = requests.utils.dict_from_cookiejar(cj)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: load cookies from {}:\n'.format(args.cookies))
+        if args.verbose and args.verbose.lower() == 'vv':
+            sys.stderr.write(' - {}:\n'.format(cookies))
+    elif os.path.exists('cookies.txt'):
+        cj.load('cookies.txt')
+        cookies = requests.utils.dict_from_cookiejar(cj)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: load cookies from {}:\n'.format('cookies.txt'))
+        if args.verbose and args.verbose.lower() == 'vv':
+            sys.stderr.write(' - {}:\n'.format(cookies))
+    # load cookies given via config
     if 'deviantart' in config:
         if 'userinfo' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load userinfo cookie\n')
             cookies['userinfo'] = config['deviantart']['userinfo']
         if 'auth' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load auth cookie\n')
             cookies['auth'] = config['deviantart']['auth']
         if 'auth_secure' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load auth_secure cookie\n')
             cookies['auth_secure'] = config['deviantart']['auth_secure']
+    
     if args.query:
         crawl('https://backend.deviantart.com/rss.xml?type=deviation&q={}'.format(args.query))
     elif args.gallery:
