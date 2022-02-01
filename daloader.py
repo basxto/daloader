@@ -46,29 +46,34 @@ def downloadFile(dirname, fullPath, url):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # download image
-    if not os.path.exists(fullPath):
+    if not os.path.exists(fullPath) or args.force.lower() != 'no':
         urllib.request.urlretrieve(url, fullPath)
+    else:
+        sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
 
 def downloadStory(content, fullPath, url, title, author, license):
-    # remove scripts
-    content = scriptRegex.sub('', content)
-    # remove too much whitespace
-    content = multiWhitespace.sub(' ', content)
-    # replace breaks
-    content = breakRegex.sub('\n', content)
-    # remove HTML tags
-    content = tagRegex.sub('', content)
-    # unescape escaped characters
-    content = html.unescape(content)
-    # remove too many line breaks
-    content = multiNewline.sub('\n\n', content)
-    if args.verbose and args.verbose.lower() == 'v':
-        sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
-    # write file
-    file = open(fullPath, 'w')
-    if stringToBool(args.header):
-        file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, title, author, license))
-    file.write(content)
+    if not os.path.exists(fullPath) or args.force.lower() != 'no':
+        # remove scripts
+        content = scriptRegex.sub('', content)
+        # remove too much whitespace
+        content = multiWhitespace.sub(' ', content)
+        # replace breaks
+        content = breakRegex.sub('\n', content)
+        # remove HTML tags
+        content = tagRegex.sub('', content)
+        # unescape escaped characters
+        content = html.unescape(content)
+        # remove too many line breaks
+        content = multiNewline.sub('\n\n', content)
+        if args.verbose and args.verbose.lower() == 'v':
+            sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
+        # write file
+        file = open(fullPath, 'w')
+        if stringToBool(args.header):
+            file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, title, author, license))
+        file.write(content)
+    else:
+        sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
 
 
 # return False for error
@@ -126,7 +131,7 @@ def downloadDeviation(url):
                 # create folders
                 if not os.path.exists(dirname):
                     os.makedirs(dirname)
-                # download image
+                # download story
                 if not os.path.exists(fullPath) or args.force.lower() != 'no':
                     realDeviation = requests.get(url, cookies=cookies).text
                     if args.verbose and args.verbose.lower() == 'vv':
@@ -137,6 +142,8 @@ def downloadDeviation(url):
                     # pick description
                     content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
                     downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license)
+                else:
+                    sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
             else:
                 sys.stderr.write('Type "story" skipped\n')
                 return False
