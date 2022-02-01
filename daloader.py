@@ -27,6 +27,8 @@ scriptRegex = re.compile('<script.*?script>', re.MULTILINE)
 multiWhitespace = re.compile('\\s\\s+')
 tagRegex = re.compile('<.*?>')
 galleryTitleRegex = re.compile('<span class="folder-title">([^<]*)</span>')
+#jpg from http://bla.bla/bla/bla.jpg?blub&blub
+filextRegex = re.compile('[^\?]*\.([a-z]+)(\?.*)?')
 
 def stringToBool(str):
     return str and ( str.upper() == 'YES' or str.upper() == 'TRUE' or str.upper() == 'ON' or str.upper() == 'Y' or str == '1')
@@ -81,7 +83,7 @@ def downloadDeviation(url):
         if deviation['type'] == 'photo':
             if not args.type or args.type.lower() == 'picture':
                 # use original file extension
-                workFile = '{}.{}'.format(workFile,deviation['url'].split('.')[-1])
+                workFile = '{}.{}'.format(workFile, filextRegex.match(deviation['url'])[1])
                 fullPath = os.path.join(dirname, workFile)
                 downloadFile(dirname, fullPath, deviation['url'])
             else:
