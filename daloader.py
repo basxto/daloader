@@ -279,6 +279,12 @@ def handleUrl(url):
     elif wikicommonsRegex.match(url):
         downloadWiki(url)
     elif sscRegex.match(url):
+        if stringToBool(args.no_adult):
+            sys.stderr.write('Skip adult content "{}"\n'.format(url))
+            return False
+        if stringToBool(args.cc_only):
+            sys.stderr.write('Skip "{}" sexstory "{}"\n'.format(license, url))
+            return False
         return downloadSsc(url)
     else:
         sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
