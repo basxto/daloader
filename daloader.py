@@ -6,6 +6,13 @@ import requests
 import urllib.request
 import re
 import html
+import configparser
+
+cookies = {
+    'auth': '',
+    'auth_secure': '',
+    'userinfo': ''
+}
 
 ccRegex = re.compile('/(by[a-z\\-]*)/')
 ccVerRegex = re.compile('\\d\\.\\d')
@@ -29,6 +36,7 @@ def downloadFile(dirname, fullPath, url):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # download image
+    #TODO: use cookie
     if not os.path.exists(fullPath):
         urllib.request.urlretrieve(url, fullPath)
 
@@ -37,7 +45,7 @@ def downloadDeviation(url):
     try:
         if args.verbose and args.verbose.lower() != 'no':
             sys.stderr.write('Debug: download {}\n'.format('https://backend.deviantart.com/oembed?url={}'.format(url)))
-        deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
+        deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url), cookies=cookies).json()
         if args.verbose and args.verbose.lower() == 'v':
             sys.stderr.write('Debug: oembed deviation:\n {}\n'.format(deviation))
     except ValueError:
@@ -88,7 +96,7 @@ def downloadDeviation(url):
                     os.makedirs(dirname)
                 # download image
                 if not os.path.exists(fullPath) or args.force.lower() != 'no':
-                    realDeviation = requests.get(url).text
+                    realDeviation = requests.get(url, cookies=cookies).text
                     if args.verbose and args.verbose.lower() == 'vv':
                         sys.stderr.write('Debug: html deviation:\n {}\n'.format(realDeviation))
                     #print(descriptionRegex.findall(realDeviation))
@@ -130,8 +138,8 @@ def downloadWiki(url):
     authorUrl = '#'
     license = 'proprietary'
     licenseUrl = '#'
-    metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile)).json()
-    urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile)).json()
+    metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile), cookies=cookies).json()
+    urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile), cookies=cookies).json()
     # we don't know the page id, but only have one match
 
     pages = metaResponse['query']['pages']
@@ -181,7 +189,7 @@ def crawl(queryurl):
     matched = 0
     offset = 0
     while matched < int(args.amount):
-        search = requests.get('{}&offset={}'.format(queryurl,offset)).text
+        search = requests.get('{}&offset={}'.format(queryurl,offset), cookies=cookies).text
         urls = rssLinks.findall(search)
         # stop when we get an empty response
         if len(urls) == 0:
@@ -216,7 +224,7 @@ def handleUrl(url):
                 meta = 'all'
             else:
                 # gallery directory
-                directory = requests.get(url).text
+                directory = requests.get(url, cookies=cookies).text
                 titles = galleryTitleRegex.findall(directory)
                 if len(titles) == 0:
                     sys.stderr.write('Can\'t extract title of gallery directory "{}"\n'.format(url))
@@ -236,6 +244,7 @@ def handleUrl(url):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--ini", help="Path to .ini file (default: working directory)")
     parser.add_argument("--url", help="Deviantart site or gallery")
     parser.add_argument("-f", help="Read URLs from file")
     parser.add_argument("--verbose", "-v", default="no", help="Verbose; -vv even more verbose; -vvv even html source")
@@ -253,6 +262,19 @@ def main():
     parser.add_argument("--output-format", default="[{filename}]({path}) as [{title}]({url}) licenced under [{license}]({license_url}) by [{author}]({author_url})", help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title} {path} {folder} {filename}")
     global args
     args = parser.parse_args()
+    global config
+    config = configparser.RawConfigParser()
+    if args.ini:
+        config.read(args.ini)
+    else:
+        config.read('daloader.ini')
+    if 'deviantart' in config:
+        if 'userinfo' in config['deviantart']:
+            cookies['userinfo'] = config['deviantart']['userinfo']
+        if 'auth' in config['deviantart']:
+            cookies['auth'] = config['deviantart']['auth']
+        if 'auth_secure' in config['deviantart']:
+            cookies['auth_secure'] = config['deviantart']['auth_secure']
     if args.query:
         crawl('https://backend.deviantart.com/rss.xml?type=deviation&q={}'.format(args.query))
     elif args.gallery:
