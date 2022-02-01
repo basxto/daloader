@@ -1,9 +1,9 @@
-**D**igital **a**rtwork down**loader** for deviantart.com and commons.wikimedia.org
+**D**igital **a**rtwork down**loader** for deviantart.com, commons.wikimedia.org and sexstories.com
 
 # Features
 ## General
 * Get URLs from plain text list
-* Output attribution information in terminal
+* Output attribution information in terminal (source URL, author, lincense)
 
 ## Deviantart
 * Work directly with artwork, favorite or gallery URLs
@@ -11,11 +11,20 @@
 * Filter by type (image, story)
 * Filter by safety status (all, adult, non-adult)
 * Get URLs via search query
+* Cookie support for mature content
 
 # How Deviantart gets accessed
 * [RSS API](https://www.deviantart.com/developers/rss) (search, gallery, favorite)
 * [oEmbed API](https://www.deviantart.com/developers/oembed) (filters, image extraction)
 * Parsing the site (gallery folders, story extraction)
+
+## WikiMedia Commons
+* Download videos, animated gifs and image
+* Rewrite URLs
+
+## Sexstories.com
+* Story extraction via site parsing
+* Rewrite URLs
 
 # Example
 

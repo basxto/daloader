@@ -159,6 +159,8 @@ def downloadSsc(url):
     authorUrl = "https://www.sexstories.com" + authorCombined[0][0]
     author = authorCombined[0][1]
     workFile = specialChars.sub('_', title.lower()) + '-' + sscRegex.findall(url)[0]
+    # rewrite urls
+    url = "https://www.sexstories.com/story/" + sscRegex.findall(url)[0] + "/" + specialChars.sub('_', title.lower())
     dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=title, deviation={}).lower())
     # os.path.exists does not accept empty string
     if dirname == '':
