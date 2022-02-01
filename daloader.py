@@ -14,15 +14,20 @@ cookies = {
     'userinfo': ''
 }
 
-ccRegex = re.compile('/(by[a-z\\-]*)/')
-ccVerRegex = re.compile('\\d\\.\\d')
-specialChars = re.compile('[^\\w/\\.\'\\-]+')
-urlRegex = re.compile('https?://([\\w\\-]+).deviantart.com/([\\w\\-]+).*')
+ccRegex = re.compile(r'/(by[a-z\-]*)/')
+ccVerRegex = re.compile(r'\d\.\d')
+specialChars = re.compile(r'[^\w/\.\'\-]+')
+urlRegex = re.compile(r'https?://([\w\-]+|commons).(deviantart|wikimedia|sexstories).(com|org)/.*')
+daRegex = re.compile(r'https?://([\w\-]+).deviantart.com/([\w\-]+).*')
 # allows anchor links
 wikicommonsRegex = re.compile(r'https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)(?:\?.*)?')
+sscRegex = re.compile(r'https?://www.sexstories.com/story/([0-9]*)/?.*')
 rssLinks = re.compile(r'<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
 descriptionRegex = re.compile(r'<div class="legacy-journal[a-zA-Z0-9_\s]*?">(.*?)</div>', re.MULTILINE)
+sscTitleRegex = re.compile(r'<h2>([^<>]*)<span', re.MULTILINE)
+sscAuthorRegex = re.compile(r'by\s*<a\s+href="(/profile[^"]+)">([^<>]+)</a', re.MULTILINE)
+sscDescriptionRegex = re.compile(r'CONTENT\s*-->\s*<div class="block_panel[a-zA-Z0-9_\s]*?">(.*)<!--\s*VOTES', re.MULTILINE)
 scriptRegex = re.compile(r'<script.*?script>', re.MULTILINE)
 multiWhitespace = re.compile(r'\s\s+')
 multiNewline = re.compile('\n\n\n+')
@@ -40,10 +45,32 @@ def downloadFile(dirname, fullPath, url):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # download image
-    #TODO: use cookie
     if not os.path.exists(fullPath):
         urllib.request.urlretrieve(url, fullPath)
 
+def downloadStory(content, fullPath, url, title, author, license):
+    # remove scripts
+    content = scriptRegex.sub('', content)
+    # remove too much whitespace
+    content = multiWhitespace.sub(' ', content)
+    # replace breaks
+    content = breakRegex.sub('\n', content)
+    # remove HTML tags
+    content = tagRegex.sub('', content)
+    # unescape escaped characters
+    content = html.unescape(content)
+    # remove too many line breaks
+    content = multiNewline.sub('\n\n', content)
+    if args.verbose and args.verbose.lower() == 'v':
+        sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
+    # write file
+    file = open(fullPath, 'w')
+    if stringToBool(args.header):
+        file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, title, author, license))
+    file.write(content)
+
+
+# return False for error
 def downloadDeviation(url):
     # get json representation
     try:
@@ -108,25 +135,7 @@ def downloadDeviation(url):
                         sys.stderr.write('Debug: deviation full content:\n {}\n'.format(descriptionRegex.findall(realDeviation)))
                     # pick description
                     content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
-                    # remove scripts
-                    content = scriptRegex.sub('', content)
-                    # remove too much whitespace
-                    content = multiWhitespace.sub(' ', content)
-                    # replace breaks
-                    content = breakRegex.sub('\n', content)
-                    # remove HTML tags
-                    content = tagRegex.sub('', content)
-                    # unescape escaped characters
-                    content = html.unescape(content)
-                    # and line breaks
-                    content = multiNewline.sub('\n\n', content)
-                    if args.verbose and args.verbose.lower() == 'v':
-                        sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
-                    # write file
-                    file = open(fullPath, 'w')
-                    if stringToBool(args.header):
-                        file.write('{}\n\n"{}" by {} under {}\n\n'.format(url, deviation['title'], deviation['author_name'], license))
-                    file.write(content)
+                    downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license)
             else:
                 sys.stderr.write('Type "story" skipped\n')
                 return False
@@ -135,6 +144,32 @@ def downloadDeviation(url):
             return False
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=deviation['author_name'], author_url=deviation['author_url'], title=deviation['title'], deviation=deviation, path=fullPath, folder=dirname, filename=workFile))
     return True
+
+def downloadSsc(url):
+    fullPath = ''
+    dirname = ''
+    author = 'unknown'
+    authorUrl = '#'
+    license = 'proprietary'
+    licenseUrl = '#'
+    story = requests.get(url, cookies=cookies).text.replace('\n','')
+    title = sscTitleRegex.findall(story)[0].strip()
+    #print(story)
+    authorCombined = sscAuthorRegex.findall(story)
+    authorUrl = "https://www.sexstories.com" + authorCombined[0][0]
+    author = authorCombined[0][1]
+    workFile = specialChars.sub('_', title.lower()) + '-' + sscRegex.findall(url)[0]
+    dirname = specialChars.sub('_', args.folder_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=title, deviation={}).lower())
+    # os.path.exists does not accept empty string
+    if dirname == '':
+        dirname = '.'
+    workFile = '{}.{}'.format(workFile,'txt')
+    fullPath = os.path.join(dirname, workFile)
+    #print(sscDescriptionRegex.findall(story))
+    content = sscDescriptionRegex.findall(story)[0]
+    downloadStory(content, fullPath, url, title, author, license)
+    print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=title, deviation={}, path=fullPath, folder=dirname, filename=workFile))
+    return False
 
 def downloadWiki(url):
     workFile = wikicommonsRegex.findall(url)[0]
@@ -215,8 +250,8 @@ def handleUrl(url):
     if not urlRegex.match(url):
         sys.stderr.write('Skip invalid url "{}"\n'.format(url))
         return False
-    if urlRegex.match(url):
-        matches = urlRegex.findall(url)
+    if daRegex.match(url):
+        matches = daRegex.findall(url)
         if matches[0][0] == 'www':
             author = matches[0][1]
         else:
@@ -243,6 +278,8 @@ def handleUrl(url):
             sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
     elif wikicommonsRegex.match(url):
         downloadWiki(url)
+    elif sscRegex.match(url):
+        return downloadSsc(url)
     else:
         sys.stderr.write('Can\'t handle url "{}"\n'.format(url))
         return False
