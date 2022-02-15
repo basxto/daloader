@@ -22,6 +22,7 @@ urlRegex = re.compile(r'https?://([\w\-]+|commons).(deviantart|wikimedia|sexstor
 daRegex = re.compile(r'https?://([\w\-]+).deviantart.com/([\w\-]+).*')
 # allows anchor links
 wikicommonsRegex = re.compile(r'https?://commons.wikimedia.org/wiki/(?:.*#.*)?File:(.+)(?:\?.*)?')
+storyRegex = re.compile(r'.*')
 sscRegex = re.compile(r'https?://www.sexstories.com/story/([0-9]*)/?.*')
 rssLinks = re.compile(r'<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
@@ -67,6 +68,11 @@ def downloadStory(content, fullPath, url, title, author, license):
         content = multiNewline.sub('\n\n', content)
         if args.verbose and args.verbose.lower() == 'v':
             sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(content))
+        if args.regex != "no":
+            regmatch = storyRegex.search(content)
+            if not regmatch or regmatch.span()[1] == 0:
+                sys.stderr.write('Skipped "{}" because regex doesn\'t match\n'.format(url))
+                return False
         # write file
         file = open(fullPath, 'w')
         if stringToBool(args.header):
@@ -74,6 +80,7 @@ def downloadStory(content, fullPath, url, title, author, license):
         file.write(content)
     else:
         sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
+    return True
 
 
 # return False for error
@@ -146,7 +153,8 @@ def downloadDeviation(url):
                     else:
                         sys.stderr.write('Can’t extract "{}"\n'.format(url,fullPath))
                         return False
-                    downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license)
+                    if not downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license):
+                        return False
                 else:
                     sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
             else:
@@ -182,9 +190,10 @@ def downloadSsc(url):
     fullPath = os.path.join(dirname, workFile)
     #print(sscDescriptionRegex.findall(story))
     content = sscDescriptionRegex.findall(story)[0]
-    downloadStory(content, fullPath, url, title, author, license)
+    if not downloadStory(content, fullPath, url, title, author, license):
+        return False
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=title, deviation={}, path=fullPath, folder=dirname, filename=workFile))
-    return False
+    return True
 
 def downloadWiki(url):
     workFile = wikicommonsRegex.findall(url)[0]
@@ -237,7 +246,7 @@ def downloadWiki(url):
     fullPath = os.path.join(dirname, workFile)
     downloadFile(dirname, fullPath, rawUrl)
     print(args.output_format.format(license=license, license_url=licenseUrl, url=url, author=author, author_url=authorUrl, title=extmeta['ObjectName']['value'], deviation={}, path=fullPath, folder=dirname, filename=workFile))
-    return False
+    return True
 
 def crawl(queryurl):
     if args.verbose and args.verbose.lower() != 'no':
@@ -316,6 +325,7 @@ def main():
     parser.add_argument("--force", default="no", help="Overwrite existing files")
     parser.add_argument("--query", help="Download first matches for search term")
     parser.add_argument("--gallery", help="Download first matches of specified user's gallery")
+    parser.add_argument("--regex", default="no", help="Regex that has to be in a story")
     parser.add_argument("--favorite", help="Download first matches of specified user's favorites")
     parser.add_argument("--amount", default="20", help="How many matches to download (default is 20)")
     parser.add_argument("--cc-only", help="Only allow deviations licensed under creative commons")
@@ -364,6 +374,9 @@ def main():
             if args.verbose and args.verbose.lower() != 'no':
                 sys.stderr.write('Debug: load auth_secure cookie\n')
             cookies['auth_secure'] = config['deviantart']['auth_secure']
+    
+    if args.regex != "no":
+        storyRegex = re.compile(args.regex,re.I)
     
     if args.query:
         crawl('https://backend.deviantart.com/rss.xml?type=deviation&q={}'.format(args.query))
