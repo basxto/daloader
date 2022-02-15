@@ -140,7 +140,12 @@ def downloadDeviation(url):
                     if args.verbose and args.verbose.lower() == 'v':
                         sys.stderr.write('Debug: deviation full content:\n {}\n'.format(descriptionRegex.findall(realDeviation)))
                     # pick description
-                    content = descriptionRegex.findall(realDeviation.replace('\n',''))[0]
+                    content = descriptionRegex.findall(realDeviation.replace('\n',''))
+                    if len(content)>0:
+                        content = content[0]
+                    else:
+                        sys.stderr.write('Can’t extract "{}"\n'.format(url,fullPath))
+                        return False
                     downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license)
                 else:
                     sys.stderr.write('Skipped already existing content "{}" -> "{}"\n'.format(url,fullPath))
@@ -320,6 +325,7 @@ def main():
     parser.add_argument("--type", help="Limit media type (picture, story)")
     parser.add_argument("--folder-format", default="{license}", help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title}")
     parser.add_argument("--output-format", default="[{filename}]({path}) as [{title}]({url}) licenced under [{license}]({license_url}) by [{author}]({author_url})", help="Allowed variables: {license} {license_url} {url} {author} {author_url} {title} {path} {folder} {filename}")
+    global cookies
     global args
     args = parser.parse_args()
     global config
