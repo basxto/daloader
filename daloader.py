@@ -92,7 +92,7 @@ def downloadDeviation(url):
     try:
         if args.verbose and args.verbose.lower() != 'no':
             sys.stderr.write('Debug: download {}\n'.format('https://backend.deviantart.com/oembed?url={}'.format(url)))
-        deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url), cookies=cookies).json()
+        deviation = requests.get('https://backend.deviantart.com/oembed?url={}'.format(url)).json()
         if args.verbose and args.verbose.lower()[0] == 'v':
             sys.stderr.write('Debug: oembed deviation:\n {}\n'.format(deviation))
     except ValueError:
@@ -179,7 +179,7 @@ def downloadSsc(url):
     license = 'proprietary'
     licenseUrl = '#'
     try:
-        story = requests.get(url, cookies=cookies).text.replace('\n','')
+        story = requests.get(url).text.replace('\n','')
     except ValueError:
         sys.stderr.write('Failed to parse story "{}"\n'.format(url))
         return False
@@ -228,8 +228,8 @@ def downloadWiki(url):
     authorUrl = '#'
     license = 'proprietary'
     licenseUrl = '#'
-    metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile), cookies=cookies).json()
-    urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile), cookies=cookies).json()
+    metaResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=extmetadata&format=json&titles=File:{}'.format(workFile)).json()
+    urlResponse = requests.get('https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&titles=File:{}'.format(workFile)).json()
     # we don't know the page id, but only have one match
 
     pages = metaResponse['query']['pages']
@@ -279,7 +279,7 @@ def crawl(queryurl):
     while matched < int(args.amount):
         if args.verbose and args.verbose.lower() != 'no':
             sys.stderr.write('Debug: crawl {}&offset={}\n'.format(queryurl,offset))
-        search = requests.get('{}&offset={}'.format(queryurl,offset), cookies=cookies).text
+        search = requests.get('{}&offset={}'.format(queryurl,offset)).text
         urls = rssLinks.findall(search)
         # stop when we get an empty response
         if len(urls) == 0:
