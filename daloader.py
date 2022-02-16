@@ -144,6 +144,18 @@ def downloadDeviation(url):
                 # download story
                 if not os.path.exists(fullPath) or args.force.lower() != 'no':
                     realDeviation = requests.get(url, cookies=cookies).text
+                    # make sure we are logged in
+                    if deviation['safety'] == 'adult':
+                        firstTry = True
+                        while realDeviation.find('<span>Log Out</span>') == -1:
+                            if not firstTry:
+                                sys.stderr.write('Please supply valid cookies and hit enter!\n')
+                                input('')
+                            else:
+                                sys.stderr.write('Reload cookies for mature content "{}"\n'.format(url))
+                            loadCookies()
+                            realDeviation = requests.get(url, cookies=cookies).text
+                            firstTry = False
                     if args.verbose and args.verbose.lower() == 'vv':
                         sys.stderr.write('Debug: html deviation:\n {}\n'.format(realDeviation))
                     #print(descriptionRegex.findall(realDeviation))
@@ -364,6 +376,48 @@ def handleUrl(url):
         return False
     return True
 
+def loadCookies():
+    global cookies
+    global args
+    global config
+    cj = http.cookiejar.MozillaCookieJar()
+    # load cookie file into cookies dict
+    if args.cookies and os.path.exists(args.cookies):
+        cj.load(args.cookies)
+        cookies = requests.utils.dict_from_cookiejar(cj)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: load cookies from {}:\n'.format(args.cookies))
+        if args.verbose and args.verbose.lower() == 'vv':
+            sys.stderr.write(' - {}:\n'.format(cookies))
+    elif os.path.exists('cookies.txt'):
+        cj.load('cookies.txt')
+        cookies = requests.utils.dict_from_cookiejar(cj)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: load cookies from {}:\n'.format('cookies.txt'))
+        if args.verbose and args.verbose.lower() == 'vv':
+            sys.stderr.write(' - {}:\n'.format(cookies))
+    elif os.path.exists('cookies-deviantart-com.txt'):
+        cj.load('cookies-deviantart-com.txt')
+        cookies = requests.utils.dict_from_cookiejar(cj)
+        if args.verbose and args.verbose.lower() != 'no':
+            sys.stderr.write('Debug: load cookies from {}:\n'.format('cookies-deviantart-com.txt'))
+        if args.verbose and args.verbose.lower() == 'vv':
+            sys.stderr.write(' - {}:\n'.format(cookies))
+    # load cookies given via config
+    if 'deviantart' in config:
+        if 'userinfo' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load userinfo cookie\n')
+            cookies['userinfo'] = config['deviantart']['userinfo']
+        if 'auth' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load auth cookie\n')
+            cookies['auth'] = config['deviantart']['auth']
+        if 'auth_secure' in config['deviantart']:
+            if args.verbose and args.verbose.lower() != 'no':
+                sys.stderr.write('Debug: load auth_secure cookie\n')
+            cookies['auth_secure'] = config['deviantart']['auth_secure']
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cookies", help="Full path to cookies.txt file (default: working directory)")
@@ -395,36 +449,7 @@ def main():
         config.read(args.ini)
     else:
         config.read('daloader.ini')
-    cj = http.cookiejar.MozillaCookieJar()
-    # load cookie file into cookies dict
-    if args.cookies and os.path.exists(args.cookies):
-        cj.load(args.cookies)
-        cookies = requests.utils.dict_from_cookiejar(cj)
-        if args.verbose and args.verbose.lower() != 'no':
-            sys.stderr.write('Debug: load cookies from {}:\n'.format(args.cookies))
-        if args.verbose and args.verbose.lower() == 'vv':
-            sys.stderr.write(' - {}:\n'.format(cookies))
-    elif os.path.exists('cookies.txt'):
-        cj.load('cookies.txt')
-        cookies = requests.utils.dict_from_cookiejar(cj)
-        if args.verbose and args.verbose.lower() != 'no':
-            sys.stderr.write('Debug: load cookies from {}:\n'.format('cookies.txt'))
-        if args.verbose and args.verbose.lower() == 'vv':
-            sys.stderr.write(' - {}:\n'.format(cookies))
-    # load cookies given via config
-    if 'deviantart' in config:
-        if 'userinfo' in config['deviantart']:
-            if args.verbose and args.verbose.lower() != 'no':
-                sys.stderr.write('Debug: load userinfo cookie\n')
-            cookies['userinfo'] = config['deviantart']['userinfo']
-        if 'auth' in config['deviantart']:
-            if args.verbose and args.verbose.lower() != 'no':
-                sys.stderr.write('Debug: load auth cookie\n')
-            cookies['auth'] = config['deviantart']['auth']
-        if 'auth_secure' in config['deviantart']:
-            if args.verbose and args.verbose.lower() != 'no':
-                sys.stderr.write('Debug: load auth_secure cookie\n')
-            cookies['auth_secure'] = config['deviantart']['auth_secure']
+    loadCookies()
     
     if args.regex != 'no':
         storyRegex = re.compile(args.regex,re.I)
