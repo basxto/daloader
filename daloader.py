@@ -8,6 +8,8 @@ import re
 import html
 import configparser
 import http.cookiejar
+import lxml.html
+import lxml.html.clean
 
 cookies = {
     'auth': '',
@@ -31,7 +33,6 @@ descriptionRegex = re.compile(r'<div class="legacy-journal[a-zA-Z0-9_\s]*?">(.*?
 sscTitleRegex = re.compile(r'<h2>([^<>]*)<span', re.MULTILINE)
 sscAuthorRegex = re.compile(r'by\s*<a\s+href="(/profile[^"]+)">([^<>]+)</a', re.MULTILINE)
 sscDescriptionRegex = re.compile(r'CONTENT\s*-->\s*<div class="block_panel[a-zA-Z0-9_\s]*?">(.*)<!--\s*VOTES', re.MULTILINE)
-scriptRegex = re.compile(r'<script.*?script>', re.MULTILINE)
 multiWhitespace = re.compile(r'\s\s+')
 multiNewline = re.compile('\n\n\n+')
 breakRegex = re.compile(r'(</p>|<br\s?/?>)')
@@ -55,8 +56,6 @@ def downloadFile(dirname, fullPath, url):
 
 def downloadStory(content, fullPath, url, title, author, license):
     if not os.path.exists(fullPath) or args.force.lower() != 'no':
-        # remove scripts
-        content = scriptRegex.sub('', content)
         # remove too much whitespace
         content = multiWhitespace.sub(' ', content)
         # replace breaks
@@ -158,16 +157,43 @@ def downloadDeviation(url):
                             firstTry = False
                     if args.verbose and args.verbose.lower() == 'vv':
                         sys.stderr.write('Debug: html deviation:\n {}\n'.format(realDeviation))
-                    #print(descriptionRegex.findall(realDeviation))
-                    if args.verbose and args.verbose.lower() == 'v':
-                        sys.stderr.write('Debug: deviation full content:\n {}\n'.format(descriptionRegex.findall(realDeviation)))
                     # pick description
-                    content = descriptionRegex.findall(realDeviation.replace('\n',''))
+                    """ content = descriptionRegex.findall(realDeviation.replace('\n',''))
                     if len(content)>0:
                         content = content[0]
                     else:
                         sys.stderr.write('Can’t extract "{}"\n'.format(url,fullPath))
+                        return False """
+                    tree = lxml.html.fromstring(realDeviation)
+                    # clean the source to simplify it
+                    cleaner = lxml.html.clean.Cleaner()
+                    cleaner.javascript = True
+                    cleaner.scripts = True
+                    cleaner.comments = True
+                    cleaner.style = True
+                    cleaner.page_structure = True
+                    cleaner.safe_attrs_only = True
+                    cleaner.safe_attrs = frozenset(['id','class','data-id','role'])
+                    tree = cleaner.clean_html(tree)
+                    # remove banner
+                    for com in tree.xpath('////header[@role="banner"]'):
+                        com.getparent().remove(com)
+                    # remove suggestions
+                    for com in tree.xpath('////div[@role="complementary"]'):
+                        com.getparent().remove(com)
+                    # remove parent of comments
+                    for com in tree.xpath('////div[@id="comments"]'):
+                        com.getparent().getparent().remove(com.getparent())
+                    if args.verbose and args.verbose.lower() == 'v':
+                        sys.stderr.write('Debug: deviation filtered content:\n {}\n'.format(lxml.html.tostring(tree).decode("utf-8")))
+                    # find the match for actual story (new format)
+                    richMatches = tree.xpath('////div[@data-id="rich-content-viewer"]')
+                    if len(richMatches) != 1:
+                        sys.stderr.write('Can’t extract rich text "{}", {} matches instead of expected 1\n'.format(url,len(richMatches)))
                         return False
+                    else:
+                        content = lxml.html.tostring(richMatches[0]).decode("utf-8")
+
                     if not downloadStory(content, fullPath, url, deviation['title'], deviation['author_name'], license):
                         return False
                 else:
