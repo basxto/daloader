@@ -54,7 +54,7 @@ Example scripts with further processing of the output in `examples/`
 ```
 ### Get all dependencies
 ```sh
-# pip3 install requests
+# pip3 install requests lxml cssselect
 ```
 
 ## Windows
@@ -69,5 +69,5 @@ Install via administrator terminal (Windows PowerShell or ConsoleZ)
 ### Getting all dependencies
 After installing python you  have to restart your terminal, then again with administrator rights do
 ```sh
-# pip3 install requests
+# pip3 install requests lxml cssselect
 ```

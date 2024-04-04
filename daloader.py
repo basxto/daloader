@@ -10,6 +10,7 @@ import configparser
 import http.cookiejar
 import lxml.html
 import lxml.html.clean
+import cssselect
 
 cookies = {
     'auth': '',
@@ -29,7 +30,6 @@ sscRegex = re.compile(r'https?://www.sexstories.com/(story|search)/([0-9]+)(/?.*
 sscRelRegex = re.compile(r'(/story/[0-9]*/?[^"]*)')
 rssLinks = re.compile(r'<guid isPermaLink="true">(.*?)</guid>')
 htmlLinks = re.compile(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
-descriptionRegex = re.compile(r'<div class="legacy-journal[a-zA-Z0-9_\s]*?">(.*?)</div>', re.MULTILINE)
 sscTitleRegex = re.compile(r'<h2>([^<>]*)<span', re.MULTILINE)
 sscAuthorRegex = re.compile(r'by\s*<a\s+href="(/profile[^"]+)">([^<>]+)</a', re.MULTILINE)
 sscDescriptionRegex = re.compile(r'CONTENT\s*-->\s*<div class="block_panel[a-zA-Z0-9_\s]*?">(.*)<!--\s*VOTES', re.MULTILINE)
@@ -189,8 +189,15 @@ def downloadDeviation(url):
                     # find the match for actual story (new format)
                     richMatches = tree.xpath('////div[@data-id="rich-content-viewer"]')
                     if len(richMatches) != 1:
-                        sys.stderr.write('Can’t extract rich text "{}", {} matches instead of expected 1\n'.format(url,len(richMatches)))
-                        return False
+                        sys.stderr.write('Can’t extract rich text for "{}", {} matches instead of expected 1\n'.format(url,len(richMatches)))
+                        richMatches = tree.xpath(cssselect.GenericTranslator().css_to_xpath('div.legacy-journal'))
+                        if len(richMatches) != 2:
+                            # this can happen if there is no additional description, but we play it safe
+                            sys.stderr.write('Can’t extract legacy journal for "{}", {} matches instead of expected 2\n'.format(url,len(richMatches)))
+                            return False
+                        else:
+                            sys.stderr.write('Successfully extracted "{}" as legacy journal instead of rich text\n'.format(url))
+                            content = lxml.html.tostring(richMatches[0]).decode("utf-8")
                     else:
                         content = lxml.html.tostring(richMatches[0]).decode("utf-8")
 
